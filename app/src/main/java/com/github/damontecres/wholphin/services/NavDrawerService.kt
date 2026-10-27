@@ -196,6 +196,7 @@ class NavDrawerService
                 buildList {
                     add(NavDrawerItem.Favorites)
                     if (discoverActive) add(NavDrawerItem.Discover)
+                    add(NavDrawerItem.YouTube)
                 }
             val allLibraries = getAllUserLibraries(user.id, userDto.tvAccess)
             val libraries =

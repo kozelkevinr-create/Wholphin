@@ -16,6 +16,12 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Only used for NewPipe Extractor (YouTube) & its dependencies
+        maven("https://jitpack.io") {
+            content {
+                includeGroupByRegex("(?i)com\\.github\\.teamnewpipe.*")
+            }
+        }
         @Suppress("ktlint:standard:property-naming")
         val WholphinExtensionsUsername: String? by settings
         if (!WholphinExtensionsUsername.isNullOrBlank()) {

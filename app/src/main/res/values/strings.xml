@@ -495,6 +495,8 @@
     <string name="prefer_dovi_over_hdr10_plus_summary">Removes HDR10+ metadata from Dolby Vision videos, for TVs that otherwise play them as HDR10+</string>
 
     <string name="discover">Discover</string>
+    <string name="youtube">YouTube</string>
+    <string name="youtube_search_hint">Search YouTube to get started</string>
     <string name="request">Request</string>
     <string name="pending">Pending</string>
     <string name="seerr_integration">Seerr integration</string>

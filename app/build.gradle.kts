@@ -1,10 +1,19 @@
 import com.android.build.api.dsl.ApplicationExtension
 import com.android.build.api.dsl.ProductFlavor
+import com.android.build.api.instrumentation.AsmClassVisitorFactory
+import com.android.build.api.instrumentation.ClassContext
+import com.android.build.api.instrumentation.ClassData
+import com.android.build.api.instrumentation.FramesComputationMode
+import com.android.build.api.instrumentation.InstrumentationParameters
+import com.android.build.api.instrumentation.InstrumentationScope
 import com.android.build.api.variant.FilterConfiguration
 import com.google.protobuf.gradle.id
 import com.mikepenz.aboutlibraries.plugin.DuplicateMode
 import com.mikepenz.aboutlibraries.plugin.DuplicateRule
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.objectweb.asm.ClassVisitor
+import org.objectweb.asm.MethodVisitor
+import org.objectweb.asm.Opcodes
 import java.util.Base64
 import java.util.Properties
 
@@ -211,8 +220,66 @@ configure<ApplicationExtension> {
     }
 }
 
+/**
+ * NewPipe Extractor calls [java.net.URLEncoder.encode] & [java.net.URLDecoder.decode] with a Charset
+ * which only exist on Android 13+. This redirects those calls to equivalents in `JavaCompat`.
+ */
+abstract class CompatCallRewriter : AsmClassVisitorFactory<InstrumentationParameters.None> {
+    override fun isInstrumentable(classData: ClassData): Boolean = classData.className.startsWith("org.schabi.newpipe.extractor.")
+
+    override fun createClassVisitor(
+        classContext: ClassContext,
+        nextClassVisitor: ClassVisitor,
+    ): ClassVisitor =
+        object : ClassVisitor(Opcodes.ASM9, nextClassVisitor) {
+            override fun visitMethod(
+                access: Int,
+                name: String?,
+                descriptor: String?,
+                signature: String?,
+                exceptions: Array<out String>?,
+            ): MethodVisitor =
+                object : MethodVisitor(Opcodes.ASM9, super.visitMethod(access, name, descriptor, signature, exceptions)) {
+                    override fun visitMethodInsn(
+                        opcode: Int,
+                        owner: String,
+                        name: String,
+                        descriptor: String,
+                        isInterface: Boolean,
+                    ) {
+                        val replacement =
+                            when {
+                                owner == "java/net/URLEncoder" && name == "encode" && descriptor == CHARSET_DESCRIPTOR -> "urlEncode"
+                                owner == "java/net/URLDecoder" && name == "decode" && descriptor == CHARSET_DESCRIPTOR -> "urlDecode"
+                                else -> null
+                            }
+                        if (opcode == Opcodes.INVOKESTATIC && replacement != null) {
+                            super.visitMethodInsn(
+                                Opcodes.INVOKESTATIC,
+                                "com/github/damontecres/wholphin/util/JavaCompat",
+                                replacement,
+                                descriptor,
+                                false,
+                            )
+                        } else {
+                            super.visitMethodInsn(opcode, owner, name, descriptor, isInterface)
+                        }
+                    }
+                }
+        }
+
+    companion object {
+        const val CHARSET_DESCRIPTOR = "(Ljava/lang/String;Ljava/nio/charset/Charset;)Ljava/lang/String;"
+    }
+}
+
 androidComponents {
     onVariants(selector().all()) { variant ->
+        variant.instrumentation.transformClassesWith(
+            CompatCallRewriter::class.java,
+            InstrumentationScope.ALL,
+        ) {}
+        variant.instrumentation.setAsmFramesComputationMode(FramesComputationMode.COPY_FRAMES)
         variant.outputs
             .map { it as com.android.build.api.variant.impl.VariantOutputImpl }
             .forEach { output ->
@@ -314,6 +381,7 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer.dash)
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.ui.compose)
+    implementation(libs.newpipe.extractor)
     implementation(libs.ass.media)
 
     implementation(libs.coil.core)
