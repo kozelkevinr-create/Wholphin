@@ -496,7 +496,13 @@
 
     <string name="discover">Discover</string>
     <string name="youtube">YouTube</string>
-    <string name="youtube_search_hint">Search YouTube to get started</string>
+    <string name="youtube_search_hint">Search YouTube to get started. Paste a YouTube link to download a video or playlist. Hold a video to download it.</string>
+    <string name="youtube_download">Download</string>
+    <string name="youtube_download_video">Download video</string>
+    <string name="youtube_download_playlist">Download whole playlist</string>
+    <string name="youtube_download_settings">Download settings</string>
+    <string name="youtube_download_server_url">Download server URL (like http://192.168.0.10:8946)</string>
+    <string name="youtube_download_token">Download server token</string>
     <string name="request">Request</string>
     <string name="pending">Pending</string>
     <string name="seerr_integration">Seerr integration</string>
