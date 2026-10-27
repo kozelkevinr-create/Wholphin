@@ -722,6 +722,14 @@ sealed interface AppPreference<Pref, T> {
                 setter = { prefs, _ -> prefs },
             )
 
+        val HardReset =
+            AppClickablePreference<AppPreferences>(
+                title = R.string.hard_reset,
+                summary = R.string.hard_reset_summary,
+                getter = { },
+                setter = { prefs, _ -> prefs },
+            )
+
         val UserPinnedNavDrawerItems =
             AppClickablePreference<AppPreferences>(
                 title = R.string.nav_drawer_pins,
@@ -1314,6 +1322,7 @@ val advancedPreferences =
                         AppPreference.DebugLogging,
                         AppPreference.ImageDiskCacheSize,
                         AppPreference.ClearImageCache,
+                        AppPreference.HardReset,
                         ExperimentalPreference.Enable,
                         AppPreference.OssLicenseInfo,
                     ),

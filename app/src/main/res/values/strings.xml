@@ -17,6 +17,10 @@
     <string name="chapters">Chapters</string>
     <string name="choose_stream">Choose %1$s</string>
     <string name="clear_image_cache">Clear image cache</string>
+    <string name="hard_reset">Hard reset</string>
+    <string name="hard_reset_summary">Fully close and relaunch the app</string>
+    <string name="hard_reset_body">The app will close completely and relaunch. Clearing the cache will not log out any accounts or remove servers.</string>
+    <string name="clear_cache_and_restart">Clear cache &amp; restart</string>
     <string name="collection">Collection</string>
     <string name="collections">Collections</string>
     <string name="commercial">Commercial</string>
