@@ -498,6 +498,9 @@
     <string name="youtube">YouTube</string>
     <string name="youtube_search_hint">Search YouTube to get started. Paste a YouTube link to download a video or playlist. Hold a video to download it.</string>
     <string name="youtube_download">Download</string>
+    <string name="youtube_downloads">Downloads</string>
+    <string name="youtube_no_downloads">No downloads yet</string>
+    <string name="youtube_downloads_not_configured">Set up the download server under Download settings first</string>
     <string name="youtube_download_video">Download video</string>
     <string name="youtube_download_playlist">Download whole playlist</string>
     <string name="youtube_download_settings">Download settings</string>

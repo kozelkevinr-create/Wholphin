@@ -69,6 +69,39 @@ class YouTubeDownloadService
                 }
             }
 
+        /**
+         * Recent downloads, newest first
+         */
+        suspend fun jobs(): List<DownloadJob> =
+            withContext(WholphinDispatchers.IO) {
+                check(isConfigured) { "Download server is not configured" }
+                val request =
+                    Request
+                        .Builder()
+                        .url("$serverUrl/jobs")
+                        .header("Authorization", "Bearer $token")
+                        .build()
+                okHttpClient.newCall(request).execute().use { response ->
+                    val text = response.body.string()
+                    if (!response.isSuccessful) {
+                        throw IllegalStateException("Download server returned ${response.code}")
+                    }
+                    val array = JSONObject(text).optJSONArray("jobs")
+                    List(array?.length() ?: 0) { i ->
+                        val job = array!!.getJSONObject(i)
+                        DownloadJob(
+                            id = job.optString("id"),
+                            url = job.optString("url"),
+                            playlist = job.optBoolean("playlist"),
+                            status = job.optString("status"),
+                            title = job.optString("title").takeIf { it.isNotBlank() },
+                            progress = job.optString("progress").takeIf { it.isNotBlank() },
+                            error = job.optString("error").takeIf { it.isNotBlank() },
+                        )
+                    }
+                }
+            }
+
         companion object {
             private const val PREFS_NAME = "youtube_downloads"
             private const val KEY_URL = "server_url"
@@ -86,3 +119,18 @@ class YouTubeDownloadService
                 }.getOrDefault(false)
         }
     }
+
+/**
+ * A download on the server
+ *
+ * @param status one of queued, running, done, failed
+ */
+data class DownloadJob(
+    val id: String,
+    val url: String,
+    val playlist: Boolean,
+    val status: String,
+    val title: String?,
+    val progress: String?,
+    val error: String?,
+)

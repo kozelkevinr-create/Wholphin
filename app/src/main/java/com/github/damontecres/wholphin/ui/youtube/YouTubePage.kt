@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -21,20 +20,19 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.tv.material3.Card
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import coil3.compose.AsyncImage
 import com.github.damontecres.wholphin.R
 import com.github.damontecres.wholphin.services.youtube.YouTubeDownloadService
-import com.github.damontecres.wholphin.services.youtube.YouTubeVideo
+import com.github.damontecres.wholphin.services.youtube.YouTubeChannel
+import com.github.damontecres.wholphin.services.youtube.YouTubeEntry
+import com.github.damontecres.wholphin.services.youtube.YouTubePlaylist
 import com.github.damontecres.wholphin.ui.components.BasicDialog
 import com.github.damontecres.wholphin.ui.components.CircularProgress
 import com.github.damontecres.wholphin.ui.components.ConfirmDialog
@@ -56,7 +54,7 @@ fun YouTubePage(
     val state by viewModel.state.collectAsStateWithLifecycle()
     var query by rememberSaveable { mutableStateOf("") }
 
-    var videoToDownload by remember { mutableStateOf<YouTubeVideo?>(null) }
+    var entryToDownload by remember { mutableStateOf<YouTubeEntry?>(null) }
     var urlToDownload by remember { mutableStateOf<String?>(null) }
     var settingsStep by remember { mutableStateOf<SettingsStep?>(null) }
 
@@ -76,6 +74,7 @@ fun YouTubePage(
         Row(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
         ) {
             SearchEditTextBox(
                 value = query,
@@ -87,7 +86,11 @@ fun YouTubePage(
                         viewModel.search(query)
                     }
                 },
-                modifier = Modifier.fillMaxWidth(0.6f),
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(
+                stringRes = R.string.youtube_downloads,
+                onClick = { viewModel.showDownloads() },
             )
             TextButton(
                 stringRes = R.string.youtube_download_settings,
@@ -116,7 +119,7 @@ fun YouTubePage(
                     )
                 }
 
-                state.videos.isEmpty() -> {
+                state.entries.isEmpty() -> {
                     Text(
                         text = stringResource(R.string.no_results),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -131,11 +134,12 @@ fun YouTubePage(
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                         modifier = Modifier.fillMaxSize(),
                     ) {
-                        items(state.videos, key = { it.url }) { video ->
-                            YouTubeCard(
-                                video = video,
-                                onClick = { viewModel.play(video) },
-                                onLongClick = { videoToDownload = video },
+                        items(state.entries, key = { it.url }) { entry ->
+                            YouTubeEntryCard(
+                                entry = entry,
+                                onClick = { viewModel.open(entry) },
+                                // Channels are browsed, not downloaded in full
+                                onLongClick = { if (entry !is YouTubeChannel) entryToDownload = entry },
                             )
                         }
                     }
@@ -149,14 +153,18 @@ fun YouTubePage(
         if (viewModel.downloadsConfigured) action() else settingsStep = SettingsStep.Url
     }
 
-    videoToDownload?.let { video ->
+    entryToDownload?.let { entry ->
+        val isPlaylist = entry is YouTubePlaylist
         ConfirmDialog(
-            title = stringResource(R.string.youtube_download_video),
-            body = video.title,
-            onCancel = { videoToDownload = null },
+            title =
+                stringResource(
+                    if (isPlaylist) R.string.youtube_download_playlist else R.string.youtube_download_video,
+                ),
+            body = entry.title,
+            onCancel = { entryToDownload = null },
             onConfirm = {
-                videoToDownload = null
-                requestDownload { viewModel.download(video.url, playlist = false, name = video.title) }
+                entryToDownload = null
+                requestDownload { viewModel.download(entry.url, playlist = isPlaylist, name = entry.title) }
             },
         )
     }
@@ -237,43 +245,5 @@ private fun DownloadUrlDialog(
         TextButton(stringRes = R.string.youtube_download_video, onClick = { onDownload(false) })
         TextButton(stringRes = R.string.youtube_download_playlist, onClick = { onDownload(true) })
         TextButton(stringRes = R.string.cancel, onClick = onCancel)
-    }
-}
-
-@Composable
-private fun YouTubeCard(
-    video: YouTubeVideo,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Card(onClick = onClick, onLongClick = onLongClick, modifier = modifier) {
-        Column {
-            AsyncImage(
-                model = video.thumbnailUrl,
-                contentDescription = video.title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
-            )
-            Column(
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-                modifier = Modifier.padding(8.dp),
-            ) {
-                Text(
-                    text = video.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                video.channel?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-        }
     }
 }

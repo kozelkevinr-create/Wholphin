@@ -3,7 +3,10 @@ package com.github.damontecres.wholphin.ui.youtube
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.damontecres.wholphin.services.NavigationManager
+import com.github.damontecres.wholphin.services.youtube.YouTubeChannel
 import com.github.damontecres.wholphin.services.youtube.YouTubeDownloadService
+import com.github.damontecres.wholphin.services.youtube.YouTubeEntry
+import com.github.damontecres.wholphin.services.youtube.YouTubePlaylist
 import com.github.damontecres.wholphin.services.youtube.YouTubeService
 import com.github.damontecres.wholphin.services.youtube.YouTubeVideo
 import com.github.damontecres.wholphin.ui.nav.Destination
@@ -19,7 +22,7 @@ import javax.inject.Inject
 
 data class YouTubeState(
     val loading: Boolean = false,
-    val videos: List<YouTubeVideo> = emptyList(),
+    val entries: List<YouTubeEntry> = emptyList(),
     val error: String? = null,
     val searched: Boolean = false,
 )
@@ -79,16 +82,29 @@ class YouTubeViewModel
             }
         }
 
-        fun play(video: YouTubeVideo) {
-            navigationManager.navigateTo(Destination.YouTubePlayer(video.url, video.title))
+        /**
+         * Play a video or go to the channel or playlist
+         */
+        fun open(entry: YouTubeEntry) {
+            val destination =
+                when (entry) {
+                    is YouTubeVideo -> Destination.YouTubePlayer(entry.url, entry.title)
+                    is YouTubeChannel -> Destination.YouTubeChannel(entry.url, entry.title)
+                    is YouTubePlaylist -> Destination.YouTubePlaylist(entry.url, entry.title)
+                }
+            navigationManager.navigateTo(destination)
         }
 
-        private fun load(fetch: suspend () -> List<YouTubeVideo>) {
+        fun showDownloads() {
+            navigationManager.navigateTo(Destination.YouTubeDownloads)
+        }
+
+        private fun load(fetch: suspend () -> List<YouTubeEntry>) {
             _state.update { it.copy(loading = true, error = null) }
             viewModelScope.launch {
                 try {
                     val videos = fetch()
-                    _state.update { YouTubeState(loading = false, videos = videos, searched = true) }
+                    _state.update { YouTubeState(loading = false, entries = videos, searched = true) }
                 } catch (ex: Exception) {
                     Timber.e(ex, "Error loading YouTube")
                     _state.update { YouTubeState(loading = false, error = ex.localizedMessage ?: ex.javaClass.simpleName, searched = true) }
