@@ -51,6 +51,10 @@ import com.github.damontecres.wholphin.ui.preferences.user.UserProfilePreference
 import com.github.damontecres.wholphin.ui.search.SearchPage
 import com.github.damontecres.wholphin.ui.setup.InstallUpdatePage
 import com.github.damontecres.wholphin.ui.slideshow.SlideshowPage
+import com.github.damontecres.wholphin.ui.youtube.YouTubeDownloadsPage
+import com.github.damontecres.wholphin.ui.youtube.YouTubeListingPage
+import com.github.damontecres.wholphin.ui.youtube.YouTubePage
+import com.github.damontecres.wholphin.ui.youtube.YouTubePlayerPage
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.CollectionType
 import timber.log.Timber
@@ -373,6 +377,44 @@ fun DestinationContent(
 
         Destination.Debug -> {
             DebugPage(preferences, modifier)
+        }
+
+        Destination.YouTube -> {
+            LaunchedEffect(Unit) { onClearBackdrop.invoke() }
+            YouTubePage(modifier = modifier)
+        }
+
+        Destination.YouTubeDownloads -> {
+            LaunchedEffect(Unit) { onClearBackdrop.invoke() }
+            YouTubeDownloadsPage(modifier = modifier)
+        }
+
+        is Destination.YouTubeChannel -> {
+            LaunchedEffect(Unit) { onClearBackdrop.invoke() }
+            YouTubeListingPage(
+                url = destination.url,
+                title = destination.title,
+                playlist = false,
+                modifier = modifier,
+            )
+        }
+
+        is Destination.YouTubePlaylist -> {
+            LaunchedEffect(Unit) { onClearBackdrop.invoke() }
+            YouTubeListingPage(
+                url = destination.url,
+                title = destination.title,
+                playlist = true,
+                modifier = modifier,
+            )
+        }
+
+        is Destination.YouTubePlayer -> {
+            YouTubePlayerPage(
+                url = destination.url,
+                title = destination.title,
+                modifier = modifier,
+            )
         }
 
         Destination.Discover -> {

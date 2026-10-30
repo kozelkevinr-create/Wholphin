@@ -48,6 +48,7 @@ import androidx.tv.material3.surfaceColorAtElevation
 import coil3.SingletonImageLoader
 import coil3.imageLoader
 import com.github.damontecres.wholphin.R
+import com.github.damontecres.wholphin.preferences.AppClickablePreference
 import com.github.damontecres.wholphin.preferences.AppPreference
 import com.github.damontecres.wholphin.preferences.AppPreferences
 import com.github.damontecres.wholphin.preferences.AppSwitchPreference
@@ -67,7 +68,9 @@ import com.github.damontecres.wholphin.preferences.updatePlaybackPreferences
 import com.github.damontecres.wholphin.services.Release
 import com.github.damontecres.wholphin.services.SeerrConnectionStatus
 import com.github.damontecres.wholphin.services.UpdateChecker
+import com.github.damontecres.wholphin.ui.components.BasicDialog
 import com.github.damontecres.wholphin.ui.components.ConfirmDialog
+import com.github.damontecres.wholphin.ui.components.TextButton
 import com.github.damontecres.wholphin.ui.components.ErrorMessage
 import com.github.damontecres.wholphin.ui.components.LoadingPage
 import com.github.damontecres.wholphin.ui.components.ScrollableDialog
@@ -88,7 +91,11 @@ import com.github.damontecres.wholphin.ui.tryRequestFocus
 import com.github.damontecres.wholphin.util.DataLoadingState
 import com.github.damontecres.wholphin.util.ExceptionHandler
 import com.github.damontecres.wholphin.util.LoadingState
+import com.github.damontecres.wholphin.util.clearAppCache
+import com.github.damontecres.wholphin.util.hardRestart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.util.Locale
 
@@ -413,6 +420,34 @@ fun PreferencesContent(
                                         onLongClick = {},
                                         interactionSource = interactionSource,
                                     )
+                                }
+
+                                AppPreference.HardReset -> {
+                                    var showResetDialog by remember { mutableStateOf(false) }
+                                    ClickPreference(
+                                        title = stringResource(pref.title),
+                                        summary = (pref as? AppClickablePreference<*>)?.summary?.let { stringResource(it) },
+                                        onClick = { showResetDialog = true },
+                                        modifier = focusModifier,
+                                        onLongClick = {},
+                                        interactionSource = interactionSource,
+                                    )
+                                    if (showResetDialog) {
+                                        HardResetDialog(
+                                            onCancel = { showResetDialog = false },
+                                            onRestart = {
+                                                showResetDialog = false
+                                                hardRestart(context)
+                                            },
+                                            onClearAndRestart = {
+                                                showResetDialog = false
+                                                scope.launch(ExceptionHandler()) {
+                                                    withContext(Dispatchers.IO) { clearAppCache(context) }
+                                                    hardRestart(context)
+                                                }
+                                            },
+                                        )
+                                    }
                                 }
 
                                 AppPreference.UserPinnedNavDrawerItems -> {
@@ -832,3 +867,28 @@ data class CacheUsage(
     val imageMemoryMax: Long,
     val imageDiskUsed: Long,
 )
+
+@Composable
+private fun HardResetDialog(
+    onCancel: () -> Unit,
+    onRestart: () -> Unit,
+    onClearAndRestart: () -> Unit,
+) = BasicDialog(onDismissRequest = onCancel) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.padding(16.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.hard_reset),
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = stringResource(R.string.hard_reset_body),
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        TextButton(stringRes = R.string.restart, onClick = onRestart)
+        TextButton(stringRes = R.string.clear_cache_and_restart, onClick = onClearAndRestart)
+        TextButton(stringRes = R.string.cancel, onClick = onCancel)
+    }
+}

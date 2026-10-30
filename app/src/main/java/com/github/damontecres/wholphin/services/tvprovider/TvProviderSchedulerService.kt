@@ -38,6 +38,13 @@ class TvProviderSchedulerService
     ) {
         private val activity = (context as AppCompatActivity)
 
+        private companion object {
+            private const val MIN_REFRESH_INTERVAL_MS = 30 * 60 * 1000L
+
+            @Volatile
+            private var lastOneTimeRefresh = 0L
+        }
+
         private val supportsTvProvider =
             // TODO <=25 has limited support
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
@@ -79,6 +86,10 @@ class TvProviderSchedulerService
          * Run the [TvProviderWorker] as a one-off instead of scheduled
          */
         fun launchOneTimeRefresh() {
+            val now = System.currentTimeMillis()
+            // onStop fires for every trip to the external player/screensaver; don't re-sync each time
+            if (now - lastOneTimeRefresh < MIN_REFRESH_INTERVAL_MS) return
+            lastOneTimeRefresh = now
             if (supportsTvProvider) {
                 activity.lifecycleScope.launchIO(ExceptionHandler()) {
                     serverRepository.current.value?.let { user ->

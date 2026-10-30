@@ -77,7 +77,6 @@ class HomeViewModel
         private var dataLoadingJob: Job? = null
 
         init {
-            datePlayedService.invalidateAll()
             serverRepository.currentUserDtoFlow
                 .combinePair(homeSettingsService.currentSettings)
                 .collectLatestIn(viewModelScope) { (userDto, settings) ->

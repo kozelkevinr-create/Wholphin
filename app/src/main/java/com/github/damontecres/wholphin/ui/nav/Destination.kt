@@ -85,6 +85,30 @@ sealed class Destination(
     ) : Destination()
 
     @Serializable
+    data object YouTube : Destination(false)
+
+    @Serializable
+    data object YouTubeDownloads : Destination(false)
+
+    @Serializable
+    data class YouTubeChannel(
+        val url: String,
+        val title: String,
+    ) : Destination(false)
+
+    @Serializable
+    data class YouTubePlaylist(
+        val url: String,
+        val title: String,
+    ) : Destination(false)
+
+    @Serializable
+    data class YouTubePlayer(
+        val url: String,
+        val title: String,
+    ) : Destination(true)
+
+    @Serializable
     data class Playback(
         val itemId: UUID,
         val positionMs: Long,

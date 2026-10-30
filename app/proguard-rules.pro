@@ -22,3 +22,12 @@
 -keep class androidx.media3.ui.SubtitlePainter {
   private final float outlineWidth;
 }
+
+# NewPipe Extractor (YouTube) and its Rhino JS engine reference desktop-only classes
+-dontwarn java.beans.**
+-dontwarn jdk.dynalink.**
+-dontwarn javax.script.**
+-keep class org.mozilla.javascript.** { *; }
+-keep class org.mozilla.classfile.ClassFileWriter
+-dontwarn org.mozilla.javascript.tools.**
+-keep class org.schabi.newpipe.extractor.timeago.patterns.** { *; }

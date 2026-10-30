@@ -138,6 +138,13 @@ class NavDrawerViewModel
                     )
                 }
 
+                NavDrawerItem.YouTube -> {
+                    setIndex(index)
+                    navigationManager.navigateToFromDrawer(
+                        Destination.YouTube,
+                    )
+                }
+
                 is ServerNavDrawerItem -> {
                     setIndex(index)
                     navigationManager.navigateToFromDrawer(item.destination)
@@ -169,6 +176,7 @@ class NavDrawerViewModel
                             is ServerNavDrawerItem -> it.destination
                             is NavDrawerItem.Favorites -> Destination.Favorites
                             is NavDrawerItem.Discover -> Destination.Discover
+                            is NavDrawerItem.YouTube -> Destination.YouTube
                             else -> null
                         }
                     }
@@ -242,6 +250,13 @@ sealed interface NavDrawerItem {
             get() = "a_discover"
 
         override fun name(context: Context): String = context.getString(R.string.discover)
+    }
+
+    object YouTube : NavDrawerItem {
+        override val id: String
+            get() = "a_youtube"
+
+        override fun name(context: Context): String = context.getString(R.string.youtube)
     }
 }
 
@@ -672,6 +687,10 @@ fun NavigationDrawerScope.NavItem(
 
                 NavDrawerItem.Discover -> {
                     R.string.fa_magnifying_glass_plus
+                }
+
+                NavDrawerItem.YouTube -> {
+                    R.string.fa_play
                 }
 
                 is ServerNavDrawerItem -> {
