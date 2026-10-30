@@ -22,6 +22,7 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.source.SingleSampleMediaSource
 import com.github.damontecres.wholphin.services.hilt.StandardOkHttpClient
 import com.github.damontecres.wholphin.services.youtube.NewPipeDownloader
+import com.github.damontecres.wholphin.services.youtube.YouTubeLibrary
 import com.github.damontecres.wholphin.services.youtube.YouTubePlayable
 import com.github.damontecres.wholphin.services.youtube.YouTubeService
 import com.github.damontecres.wholphin.services.youtube.YouTubeSettings
@@ -62,6 +63,7 @@ class YouTubePlayerViewModel
         @param:StandardOkHttpClient private val okHttpClient: OkHttpClient,
         private val youTubeService: YouTubeService,
         private val settings: YouTubeSettings,
+        private val library: YouTubeLibrary,
     ) : ViewModel() {
         private val _state = MutableStateFlow(YouTubePlayerState())
         val state: StateFlow<YouTubePlayerState> = _state
@@ -85,6 +87,7 @@ class YouTubePlayerViewModel
             viewModelScope.launch {
                 try {
                     val playable = youTubeService.resolve(url)
+                    playable.video?.let(library::recordWatched)
                     withContext(WholphinDispatchers.Main) {
                         val newPlayer =
                             ExoPlayer

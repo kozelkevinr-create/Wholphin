@@ -518,6 +518,12 @@
     <string name="youtube_download_video">Download video</string>
     <string name="youtube_download_playlist">Download whole playlist</string>
     <string name="youtube_options">Options</string>
+    <string name="youtube_saved">Saved</string>
+    <string name="youtube_suggested">Suggested for you</string>
+    <string name="youtube_suggested_empty">Save channels and watch videos to get suggestions here. Hold a channel or video to save it, or search above.</string>
+    <string name="youtube_save">Save</string>
+    <string name="youtube_saved_check">Saved</string>
+    <string name="youtube_refresh">Refresh</string>
     <string name="youtube_download_settings">Download settings</string>
     <string name="youtube_download_server_url">Download server URL (like http://192.168.0.10:8946)</string>
     <string name="youtube_download_token">Download server token</string>

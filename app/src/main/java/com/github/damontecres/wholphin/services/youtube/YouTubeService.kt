@@ -49,6 +49,7 @@ data class YouTubeVideo(
     override val thumbnailUrl: String?,
     val durationSeconds: Long,
     val viewCount: Long,
+    val channelUrl: String? = null,
 ) : YouTubeEntry
 
 data class YouTubeChannel(
@@ -92,6 +93,11 @@ data class YouTubeListing(
     val title: String,
     val videos: List<YouTubeVideo>,
     val cursor: YouTubeCursor? = null,
+    val thumbnailUrl: String? = null,
+    /** Subscribers of a channel or videos in a playlist */
+    val count: Long = 0,
+    /** Who made a playlist */
+    val uploader: String? = null,
 )
 
 /**
@@ -120,6 +126,8 @@ data class YouTubePlayable(
     val subtitles: List<YouTubeSubtitle> = emptyList(),
     val heights: List<Int> = emptyList(),
     val height: Int = 0,
+    /** The video as it would appear in a list, used to remember what was watched */
+    val video: YouTubeVideo? = null,
 )
 
 /**
@@ -172,6 +180,8 @@ class YouTubeService
                     info.name,
                     tabInfo?.relatedItems.orEmpty().filterIsInstance<StreamInfoItem>().map { it.toVideo() },
                     tabInfo?.nextPage?.let { YouTubeCursor(YouTubeCursor.Kind.CHANNEL, videosTab, it) },
+                    thumbnailUrl = info.avatars.firstOrNull()?.url,
+                    count = info.subscriberCount,
                 )
             }
 
@@ -185,7 +195,22 @@ class YouTubeService
                     info.name,
                     info.relatedItems.filterIsInstance<StreamInfoItem>().map { it.toVideo() },
                     info.nextPage?.let { YouTubeCursor(YouTubeCursor.Kind.PLAYLIST, url, it) },
+                    thumbnailUrl = info.thumbnails.firstOrNull()?.url,
+                    count = info.streamCount,
+                    uploader = info.uploaderName,
                 )
+            }
+
+        /**
+         * Videos YouTube suggests after watching the video at [url]
+         */
+        suspend fun relatedVideos(url: String): List<YouTubeVideo> =
+            extractor {
+                StreamInfo
+                    .getInfo(ServiceList.YouTube, url)
+                    .relatedItems
+                    .filterIsInstance<StreamInfoItem>()
+                    .map { it.toVideo() }
             }
 
         /**
@@ -249,9 +274,9 @@ class YouTubeService
                 val subtitles = info.subtitles.toSubtitles(prefs.captionLanguage)
                 if (video != null && audio != null) {
                     Timber.d("Resolved %s + %s", video.resolution, audio.averageBitrate)
-                    YouTubePlayable(info.name, video.content, audio.content, null, subtitles, heights, video.height())
+                    YouTubePlayable(info.name, video.content, audio.content, null, subtitles, heights, video.height(), info.toVideo(url))
                 } else if (hls != null) {
-                    YouTubePlayable(info.name, null, null, hls, subtitles)
+                    YouTubePlayable(info.name, null, null, hls, subtitles, video = info.toVideo(url))
                 } else {
                     // Fallback to streams that already include audio, typically lower resolution
                     val combined =
@@ -259,7 +284,7 @@ class YouTubeService
                             .filter { it.isUrl }
                             .maxByOrNull { it.height() }
                             ?: throw IllegalStateException("No playable streams found")
-                    YouTubePlayable(info.name, combined.content, null, null, subtitles, heights, combined.height())
+                    YouTubePlayable(info.name, combined.content, null, null, subtitles, heights, combined.height(), info.toVideo(url))
                 }
             }
 
@@ -312,6 +337,18 @@ class YouTubeService
                 thumbnailUrl = thumbnails.firstOrNull()?.url,
                 durationSeconds = duration,
                 viewCount = viewCount,
+                channelUrl = uploaderUrl,
+            )
+
+        private fun StreamInfo.toVideo(requestedUrl: String) =
+            YouTubeVideo(
+                url = requestedUrl,
+                title = name,
+                channel = uploaderName,
+                thumbnailUrl = thumbnails.firstOrNull()?.url,
+                durationSeconds = duration,
+                viewCount = viewCount,
+                channelUrl = uploaderUrl,
             )
 
         private fun ChannelInfoItem.toChannel() =
