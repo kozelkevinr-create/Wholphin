@@ -11,9 +11,13 @@ import org.schabi.newpipe.extractor.channel.ChannelInfo
 import org.schabi.newpipe.extractor.channel.ChannelInfoItem
 import org.schabi.newpipe.extractor.channel.tabs.ChannelTabInfo
 import org.schabi.newpipe.extractor.channel.tabs.ChannelTabs
+import org.schabi.newpipe.extractor.localization.ContentCountry
+import org.schabi.newpipe.extractor.localization.Localization
 import org.schabi.newpipe.extractor.playlist.PlaylistInfo
 import org.schabi.newpipe.extractor.playlist.PlaylistInfoItem
 import org.schabi.newpipe.extractor.search.SearchInfo
+import org.schabi.newpipe.extractor.stream.AudioStream
+import org.schabi.newpipe.extractor.stream.AudioTrackType
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 import org.schabi.newpipe.extractor.stream.VideoStream
@@ -87,7 +91,7 @@ class YouTubeService
         @param:StandardOkHttpClient private val okHttpClient: OkHttpClient,
     ) {
         private val initialized by lazy {
-            NewPipe.init(NewPipeDownloader(okHttpClient))
+            NewPipe.init(NewPipeDownloader(okHttpClient), Localization("en", "US"), ContentCountry("US"))
             true
         }
 
@@ -144,6 +148,16 @@ class YouTubeService
                 )
             }
 
+        /**
+         * YouTube serves auto-dubbed tracks next to the original; prefer the original, then English, then anything
+         */
+        private fun preferOriginalAudio(streams: List<AudioStream>): List<AudioStream> =
+            streams.filter { it.audioTrackType == AudioTrackType.ORIGINAL }.ifEmpty {
+                streams.filter { it.audioTrackType == null && it.audioLocale == null }
+            }.ifEmpty {
+                streams.filter { it.audioLocale?.language == "en" }
+            }.ifEmpty { streams }
+
         suspend fun resolve(
             url: String,
             maxHeight: Int = 1080,
@@ -162,6 +176,7 @@ class YouTubeService
                 val audio =
                     info.audioStreams
                         .filter { it.isUrl && it.format?.suffix == "m4a" }
+                        .let(::preferOriginalAudio)
                         .maxByOrNull { it.averageBitrate }
                 if (video != null && audio != null) {
                     Timber.d("Resolved %s + %s", video.resolution, audio.averageBitrate)
