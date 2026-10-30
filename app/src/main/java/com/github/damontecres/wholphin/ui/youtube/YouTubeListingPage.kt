@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -98,7 +98,11 @@ fun YouTubeListingPage(
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                         modifier = Modifier.fillMaxSize(),
                     ) {
-                        items(state.listing?.videos.orEmpty(), key = { it.url }) { video ->
+                        val videos = state.listing?.videos.orEmpty()
+                        itemsIndexed(videos, key = { _, video -> video.url }) { index, video ->
+                            if (index >= videos.size - LOAD_MORE_AHEAD) {
+                                LaunchedEffect(videos.size) { viewModel.loadMore() }
+                            }
                             YouTubeEntryCard(
                                 entry = video,
                                 onClick = { viewModel.play(video) },
@@ -123,3 +127,6 @@ fun YouTubeListingPage(
         )
     }
 }
+
+/** Start loading the next page when this close to the end of the list */
+private const val LOAD_MORE_AHEAD = 6

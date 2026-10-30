@@ -4,10 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.damontecres.wholphin.services.NavigationManager
 import com.github.damontecres.wholphin.services.youtube.YouTubeChannel
+import com.github.damontecres.wholphin.services.youtube.YouTubeCursor
 import com.github.damontecres.wholphin.services.youtube.YouTubeDownloadService
 import com.github.damontecres.wholphin.services.youtube.YouTubeEntry
+import com.github.damontecres.wholphin.services.youtube.YouTubePageResult
 import com.github.damontecres.wholphin.services.youtube.YouTubePlaylist
 import com.github.damontecres.wholphin.services.youtube.YouTubeService
+import com.github.damontecres.wholphin.services.youtube.YouTubeSettings
 import com.github.damontecres.wholphin.services.youtube.YouTubeVideo
 import com.github.damontecres.wholphin.ui.nav.Destination
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -25,6 +28,8 @@ data class YouTubeState(
     val entries: List<YouTubeEntry> = emptyList(),
     val error: String? = null,
     val searched: Boolean = false,
+    val cursor: YouTubeCursor? = null,
+    val loadingMore: Boolean = false,
 )
 
 @HiltViewModel
@@ -33,6 +38,7 @@ class YouTubeViewModel
     constructor(
         private val youTubeService: YouTubeService,
         private val downloadService: YouTubeDownloadService,
+        val settings: YouTubeSettings,
         private val navigationManager: NavigationManager,
     ) : ViewModel() {
         private val _state = MutableStateFlow(YouTubeState())
@@ -99,12 +105,44 @@ class YouTubeViewModel
             navigationManager.navigateTo(Destination.YouTubeDownloads)
         }
 
-        private fun load(fetch: suspend () -> List<YouTubeEntry>) {
+        /**
+         * Add the next page of results, called when the user nears the end of the list
+         */
+        fun loadMore() {
+            val cursor = _state.value.cursor ?: return
+            if (_state.value.loadingMore) return
+            _state.update { it.copy(loadingMore = true) }
+            viewModelScope.launch {
+                try {
+                    val result = youTubeService.more(cursor)
+                    _state.update {
+                        it.copy(
+                            entries = (it.entries + result.items).distinctBy { e -> e.url },
+                            cursor = result.cursor,
+                            loadingMore = false,
+                        )
+                    }
+                } catch (ex: Exception) {
+                    Timber.e(ex, "Error loading more YouTube results")
+                    // Stop trying so a broken page doesn't loop
+                    _state.update { it.copy(cursor = null, loadingMore = false) }
+                }
+            }
+        }
+
+        private fun load(fetch: suspend () -> YouTubePageResult<YouTubeEntry>) {
             _state.update { it.copy(loading = true, error = null) }
             viewModelScope.launch {
                 try {
-                    val videos = fetch()
-                    _state.update { YouTubeState(loading = false, entries = videos, searched = true) }
+                    val result = fetch()
+                    _state.update {
+                        YouTubeState(
+                            loading = false,
+                            entries = result.items.distinctBy { e -> e.url },
+                            searched = true,
+                            cursor = result.cursor,
+                        )
+                    }
                 } catch (ex: Exception) {
                     Timber.e(ex, "Error loading YouTube")
                     _state.update { YouTubeState(loading = false, error = ex.localizedMessage ?: ex.javaClass.simpleName, searched = true) }

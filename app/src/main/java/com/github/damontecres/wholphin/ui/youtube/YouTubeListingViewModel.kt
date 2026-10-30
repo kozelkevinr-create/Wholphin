@@ -22,6 +22,7 @@ data class YouTubeListingState(
     val loading: Boolean = true,
     val listing: YouTubeListing? = null,
     val error: String? = null,
+    val loadingMore: Boolean = false,
 )
 
 /**
@@ -59,6 +60,35 @@ class YouTubeListingViewModel
                     _state.update {
                         YouTubeListingState(loading = false, error = ex.localizedMessage ?: ex.javaClass.simpleName)
                     }
+                }
+            }
+        }
+
+        /**
+         * Add the next page of videos, called when the user nears the end of the list
+         */
+        fun loadMore() {
+            val current = _state.value
+            val listing = current.listing ?: return
+            val cursor = listing.cursor ?: return
+            if (current.loadingMore) return
+            _state.update { it.copy(loadingMore = true) }
+            viewModelScope.launch {
+                try {
+                    val result = youTubeService.more(cursor)
+                    _state.update {
+                        it.copy(
+                            listing =
+                                listing.copy(
+                                    videos = (listing.videos + result.items.filterIsInstance<YouTubeVideo>()).distinctBy { v -> v.url },
+                                    cursor = result.cursor,
+                                ),
+                            loadingMore = false,
+                        )
+                    }
+                } catch (ex: Exception) {
+                    Timber.e(ex, "Error loading more YouTube videos")
+                    _state.update { it.copy(listing = listing.copy(cursor = null), loadingMore = false) }
                 }
             }
         }

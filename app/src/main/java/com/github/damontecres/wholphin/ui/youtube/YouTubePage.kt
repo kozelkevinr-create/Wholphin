@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -57,6 +57,7 @@ fun YouTubePage(
     var entryToDownload by remember { mutableStateOf<YouTubeEntry?>(null) }
     var urlToDownload by remember { mutableStateOf<String?>(null) }
     var settingsStep by remember { mutableStateOf<SettingsStep?>(null) }
+    var showOptions by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.messages.collect { showToast(context, it) }
@@ -91,6 +92,10 @@ fun YouTubePage(
             TextButton(
                 stringRes = R.string.youtube_downloads,
                 onClick = { viewModel.showDownloads() },
+            )
+            TextButton(
+                stringRes = R.string.youtube_options,
+                onClick = { showOptions = true },
             )
             TextButton(
                 stringRes = R.string.youtube_download_settings,
@@ -134,7 +139,10 @@ fun YouTubePage(
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                         modifier = Modifier.fillMaxSize(),
                     ) {
-                        items(state.entries, key = { it.url }) { entry ->
+                        itemsIndexed(state.entries, key = { _, entry -> entry.url }) { index, entry ->
+                            if (index >= state.entries.size - LOAD_MORE_AHEAD) {
+                                LaunchedEffect(state.entries.size) { viewModel.loadMore() }
+                            }
                             YouTubeEntryCard(
                                 entry = entry,
                                 onClick = { viewModel.open(entry) },
@@ -151,6 +159,10 @@ fun YouTubePage(
     // Downloads need the server details first
     fun requestDownload(action: () -> Unit) {
         if (viewModel.downloadsConfigured) action() else settingsStep = SettingsStep.Url
+    }
+
+    if (showOptions) {
+        YouTubeSettingsDialog(viewModel.settings, onDismiss = { showOptions = false })
     }
 
     entryToDownload?.let { entry ->
@@ -220,6 +232,9 @@ fun YouTubePage(
 }
 
 private enum class SettingsStep { Url, Token }
+
+/** Start loading the next page when this close to the end of the list */
+private const val LOAD_MORE_AHEAD = 6
 
 @Composable
 private fun DownloadUrlDialog(

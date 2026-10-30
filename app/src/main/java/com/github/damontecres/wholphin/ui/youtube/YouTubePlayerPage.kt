@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,15 +34,22 @@ import androidx.compose.ui.input.key.nativeKeyCode
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.C
 import androidx.media3.common.Player
+import androidx.media3.common.text.Cue
+import androidx.media3.common.text.CueGroup
+import androidx.media3.ui.SubtitleView
 import androidx.media3.ui.compose.PlayerSurface
 import androidx.media3.ui.compose.SURFACE_TYPE_SURFACE_VIEW
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.github.damontecres.wholphin.services.youtube.YouTubeChoice
 import com.github.damontecres.wholphin.ui.components.CircularProgress
+import com.github.damontecres.wholphin.ui.components.DialogItem
+import com.github.damontecres.wholphin.ui.components.DialogPopup
 import kotlinx.coroutines.delay
 
 private const val SEEK_MS = 10_000L
@@ -64,12 +72,15 @@ fun YouTubePlayerPage(
     LaunchedEffect(url) { viewModel.load(url) }
     val state by viewModel.state.collectAsStateWithLifecycle()
     val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
     val player: Player? = state.player
     // Tracks whether the user wants playback (not paused), so seeking/buffering does not flip the icon
     var isPlaying by remember(player) { mutableStateOf(player?.playWhenReady ?: false) }
     var buffering by remember(player) { mutableStateOf(false) }
+    var cues by remember(player) { mutableStateOf<List<Cue>>(emptyList()) }
+    var menu by remember { mutableStateOf(PlayerMenu.None) }
+    // Take focus back from the options dialogs when they close
+    LaunchedEffect(menu) { if (menu == PlayerMenu.None) focusRequester.requestFocus() }
     var positionMs by remember(player) { mutableLongStateOf(0L) }
     var durationMs by remember(player) { mutableLongStateOf(0L) }
 
@@ -85,6 +96,10 @@ fun YouTubePlayerPage(
 
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     buffering = playbackState == Player.STATE_BUFFERING
+                }
+
+                override fun onCues(cueGroup: CueGroup) {
+                    cues = cueGroup.cues
                 }
             }
         player?.addListener(listener)
@@ -163,8 +178,14 @@ fun YouTubePlayerPage(
                             true
                         }
 
-                        KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
+                        KeyEvent.KEYCODE_DPAD_UP -> {
                             overlayToken++
+                            true
+                        }
+
+                        KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_MENU -> {
+                            overlayToken++
+                            menu = PlayerMenu.Main
                             true
                         }
 
@@ -181,6 +202,16 @@ fun YouTubePlayerPage(
                 modifier = Modifier.fillMaxSize(),
             )
         }
+        AndroidView(
+            factory = { context ->
+                SubtitleView(context).apply {
+                    setUserDefaultStyle()
+                    setUserDefaultTextSize()
+                }
+            },
+            update = { it.setCues(cues) },
+            modifier = Modifier.fillMaxSize(),
+        )
         if (state.loading || buffering) {
             CircularProgress(Modifier.align(Alignment.Center))
         }
@@ -211,17 +242,78 @@ fun YouTubePlayerPage(
                 isPlaying = isPlaying,
                 positionMs = positionMs,
                 durationMs = durationMs,
+                quality = state.height.takeIf { it > 0 }?.let { "${it}p" },
                 modifier = Modifier.align(Alignment.BottomStart),
             )
         }
     }
+
+    when (menu) {
+        PlayerMenu.None -> {}
+
+        PlayerMenu.Main -> {
+            DialogPopup(
+                showDialog = true,
+                title = "Playback options",
+                dialogItems =
+                    buildList {
+                        add(
+                            DialogItem(
+                                headlineContent = { Text("Quality") },
+                                supportingContent = { Text(if (state.height > 0) "${state.height}p" else "Auto") },
+                                onClick = { menu = PlayerMenu.Quality },
+                            ),
+                        )
+                        if (state.subtitles.isNotEmpty()) {
+                            add(
+                                DialogItem(
+                                    headlineContent = { Text("Captions") },
+                                    supportingContent = {
+                                        Text(state.subtitles.firstOrNull { it.id == state.selectedSubtitleId }?.label ?: "Off")
+                                    },
+                                    onClick = { menu = PlayerMenu.Captions },
+                                ),
+                            )
+                        }
+                    },
+                onDismissRequest = { menu = PlayerMenu.None },
+                dismissOnClick = false,
+                waitToLoad = false,
+            )
+        }
+
+        PlayerMenu.Quality -> {
+            ChoiceDialog(
+                title = "Quality",
+                choices = state.heights.map { YouTubeChoice(it, "${it}p") },
+                selected = state.height,
+                onSelect = viewModel::changeQuality,
+                onDismiss = { menu = PlayerMenu.None },
+            )
+        }
+
+        PlayerMenu.Captions -> {
+            ChoiceDialog(
+                title = "Captions",
+                choices =
+                    listOf(YouTubeChoice<String?>(null, "Off")) +
+                        state.subtitles.map { YouTubeChoice<String?>(it.id, it.label) },
+                selected = state.selectedSubtitleId,
+                onSelect = viewModel::selectSubtitle,
+                onDismiss = { menu = PlayerMenu.None },
+            )
+        }
+    }
 }
+
+private enum class PlayerMenu { None, Main, Quality, Captions }
 
 @Composable
 private fun PlayerControls(
     isPlaying: Boolean,
     positionMs: Long,
     durationMs: Long,
+    quality: String?,
     modifier: Modifier = Modifier,
 ) {
     val progress = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
@@ -246,6 +338,12 @@ private fun PlayerControls(
                 text = "${formatTime(positionMs)} / ${formatTime(durationMs)}",
                 style = MaterialTheme.typography.titleMedium,
                 color = Color.White,
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = "▼ Options" + quality?.let { " · $it" }.orEmpty(),
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White.copy(alpha = 0.8f),
             )
         }
         Box(
