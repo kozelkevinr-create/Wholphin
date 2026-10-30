@@ -19,6 +19,8 @@ import coil3.request.crossfade
 import coil3.util.DebugLogger
 import com.github.damontecres.wholphin.preferences.AppPreference
 import com.github.damontecres.wholphin.preferences.AppPreferences
+import okhttp3.ConnectionPool
+import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 import timber.log.Timber
 import kotlin.time.ExperimentalTime
@@ -56,20 +58,27 @@ fun CoilConfig(
 ) {
     val client =
         remember(okHttpClient, debugLogging) {
-            if (debugLogging) {
-                okHttpClient
-                    .newBuilder()
-                    .addInterceptor {
-                        val start = System.currentTimeMillis()
-                        val req = it.request()
-                        val res = it.proceed(req)
-                        val time = System.currentTimeMillis() - start
-                        Timber.v("${time}ms - ${req.url}")
-                        res
-                    }.build()
-            } else {
-                okHttpClient
-            }
+            // Images get their own dispatcher/pool so posters don't queue API calls (and vice versa)
+            okHttpClient
+                .newBuilder()
+                .dispatcher(
+                    Dispatcher().apply {
+                        maxRequests = 24
+                        maxRequestsPerHost = 8
+                    },
+                ).connectionPool(ConnectionPool())
+                .apply {
+                    if (debugLogging) {
+                        addInterceptor {
+                            val start = System.currentTimeMillis()
+                            val req = it.request()
+                            val res = it.proceed(req)
+                            val time = System.currentTimeMillis() - start
+                            Timber.v("${time}ms - ${req.url}")
+                            res
+                        }
+                    }
+                }.build()
         }
     setSingletonImageLoaderFactory { ctx ->
         Timber.i("Image diskCacheSizeBytes=$diskCacheSizeBytes")
@@ -77,7 +86,7 @@ fun CoilConfig(
             .Builder(ctx)
             .apply {
                 if (enableCache) {
-                    memoryCache(MemoryCache.Builder().maxSizePercent(ctx).build())
+                    memoryCache(MemoryCache.Builder().maxSizePercent(ctx, 0.15).build())
                     diskCache(
                         DiskCache
                             .Builder()

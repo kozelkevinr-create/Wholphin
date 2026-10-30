@@ -87,6 +87,8 @@ fun TitleOrLogo(
     )
 }
 
+private const val LOGO_MAX_WIDTH = 600
+
 @Composable
 fun rememberLogoUrl(item: BaseItem?): String? {
     val imageUrlService = LocalImageUrlService.current
@@ -95,9 +97,9 @@ fun rememberLogoUrl(item: BaseItem?): String? {
             item.data.seriesId != null &&
             item.data.parentLogoImageTag != null
         ) {
-            imageUrlService.getItemImageUrl(item.data.seriesId!!, ImageType.LOGO)
+            imageUrlService.getItemImageUrl(item.data.seriesId!!, ImageType.LOGO, maxWidth = LOGO_MAX_WIDTH)
         } else if (ImageType.LOGO in item?.data?.imageTags.orEmpty()) {
-            imageUrlService.getItemImageUrl(item, ImageType.LOGO)
+            imageUrlService.getItemImageUrl(item, ImageType.LOGO, fillWidth = LOGO_MAX_WIDTH)
         } else {
             null
         }

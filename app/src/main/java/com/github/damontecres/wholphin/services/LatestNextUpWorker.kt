@@ -133,7 +133,7 @@ class LatestNextUpSchedulerService
 
             workManager.enqueueUniquePeriodicWork(
                 uniqueWorkName = LatestNextUpWorker.WORK_NAME,
-                existingPeriodicWorkPolicy = ExistingPeriodicWorkPolicy.REPLACE,
+                existingPeriodicWorkPolicy = ExistingPeriodicWorkPolicy.UPDATE,
                 request = periodicWorkRequestBuilder.build(),
             )
         }

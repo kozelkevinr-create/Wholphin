@@ -103,8 +103,7 @@ class ScreensaverService
                     waitJob =
                         scope.launch(ExceptionHandler()) {
                             val startDelay =
-                                userPreferencesService
-                                    .getCurrent()
+                                (userPreferencesService.latest.value ?: userPreferencesService.getCurrent())
                                     .appPreferences.interfacePreferences.screensaverPreference.startDelay.milliseconds
                             delay(startDelay)
                             _state.update {
@@ -125,8 +124,7 @@ class ScreensaverService
                     dimJob =
                         scope.launch(ExceptionHandler()) {
                             val startDelay =
-                                userPreferencesService
-                                    .getCurrent()
+                                (userPreferencesService.latest.value ?: userPreferencesService.getCurrent())
                                     .appPreferences.interfacePreferences.screensaverPreference.startDelay.milliseconds
                             delay(startDelay)
                             Timber.v("state dim=%s", _state.value)

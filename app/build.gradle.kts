@@ -133,6 +133,14 @@ configure<ApplicationExtension> {
             }
         }
 
+        // Optimized build signed with the debug key; installs beside the real app for local testing
+        create("perf") {
+            initWith(getByName("release"))
+            matchingFallbacks += "release"
+            applicationIdSuffix = ".perf"
+            signingConfig = signingConfigs.getByName("debug")
+        }
+
         debug {
             isMinifyEnabled = false
             isShrinkResources = false

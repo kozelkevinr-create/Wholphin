@@ -25,6 +25,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.session.MediaSession
 import coil3.imageLoader
+import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.size.Size
 import com.github.damontecres.wholphin.data.ItemPlaybackDao
@@ -1037,11 +1038,13 @@ class PlaybackViewModel
                 (duration.inWholeMilliseconds / trickplayInfo.interval).toInt() / tilesPerImage + 1
             (0..<totalCount).forEach {
                 val url = getTrickplayUrl(it, trickplayInfo, mediaSourceId)
-                context.imageLoader.enqueue(
+                // One at a time and disk-only: parallel full-size decodes starve the player of memory
+                context.imageLoader.execute(
                     ImageRequest
                         .Builder(context)
                         .data(url)
                         .size(Size.ORIGINAL)
+                        .memoryCachePolicy(CachePolicy.DISABLED)
                         .build(),
                 )
             }

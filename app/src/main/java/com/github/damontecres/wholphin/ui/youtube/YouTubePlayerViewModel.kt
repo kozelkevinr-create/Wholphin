@@ -18,6 +18,8 @@ import com.github.damontecres.wholphin.services.youtube.NewPipeDownloader
 import com.github.damontecres.wholphin.services.youtube.YouTubePlayable
 import com.github.damontecres.wholphin.services.youtube.YouTubeService
 import com.github.damontecres.wholphin.util.WholphinDispatchers
+import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,7 +60,20 @@ class YouTubePlayerViewModel
                 try {
                     val playable = youTubeService.resolve(url)
                     withContext(WholphinDispatchers.Main) {
-                        val newPlayer = ExoPlayer.Builder(context).build()
+                        val newPlayer =
+                            ExoPlayer
+                                .Builder(
+                                    context,
+                                    DefaultRenderersFactory(context).setEnableDecoderFallback(true),
+                                ).setLoadControl(
+                                    // Smaller buffers than the default: separate video+audio at 1080p adds up on a low-RAM stick
+                                    DefaultLoadControl
+                                        .Builder()
+                                        .setBufferDurationsMs(15_000, 30_000, 1_500, 3_000)
+                                        .setTargetBufferBytes(24 * 1024 * 1024)
+                                        .setPrioritizeTimeOverSizeThresholds(false)
+                                        .build(),
+                                ).build()
                         newPlayer.setMediaSource(buildSource(playable))
                         newPlayer.prepare()
                         newPlayer.playWhenReady = true

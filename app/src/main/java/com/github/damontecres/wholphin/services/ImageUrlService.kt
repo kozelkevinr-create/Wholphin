@@ -257,6 +257,6 @@ class ImageUrlService
         }
 
         companion object {
-            private const val QUALITY = 96
+            private const val QUALITY = 85
         }
     }

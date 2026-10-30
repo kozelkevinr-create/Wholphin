@@ -46,6 +46,14 @@ class BackdropService
         private val imageUrlService: ImageUrlService,
         private val preferences: DataStore<AppPreferences>,
     ) {
+        companion object {
+            /** Backdrops are drawn at roughly this width, so don't download originals */
+            private const val BACKDROP_WIDTH = 1280
+
+            /** Palette only needs a tiny image */
+            private const val PALETTE_SIZE = 128
+        }
+
         private val extractedColorCache = LruCache<String, ExtractedColors>(50)
 
         private val _backdropFlow = MutableStateFlow<BackdropResult>(BackdropResult.NONE)
@@ -60,7 +68,7 @@ class BackdropService
                     if (item.type == BaseItemKind.GENRE) {
                         item.imageUrlOverride
                     } else {
-                        imageUrlService.getItemImageUrl(item, ImageType.BACKDROP)
+                        imageUrlService.getItemImageUrl(item, ImageType.BACKDROP, fillWidth = BACKDROP_WIDTH)
                     }
                 submit(item.id.toString(), imageUrl)
             }
@@ -146,6 +154,7 @@ class BackdropService
                         ImageRequest
                             .Builder(context)
                             .data(imageUrl)
+                            .size(PALETTE_SIZE, PALETTE_SIZE)
                             .allowHardware(false)
                             .bitmapConfig(Bitmap.Config.ARGB_8888)
                             .build()

@@ -90,16 +90,16 @@ fun YouTubePlayerPage(
         player?.addListener(listener)
         onDispose { player?.removeListener(listener) }
     }
-    LaunchedEffect(player) {
-        while (player != null) {
+    var overlayToken by remember { mutableLongStateOf(0L) }
+    var overlayVisible by remember { mutableStateOf(true) }
+    LaunchedEffect(player, overlayVisible) {
+        // Only poll while the overlay that displays the position is on screen
+        while (player != null && overlayVisible) {
             positionMs = player.currentPosition
             durationMs = player.duration.takeIf { it != C.TIME_UNSET } ?: 0L
             delay(POSITION_UPDATE_MS)
         }
     }
-
-    var overlayToken by remember { mutableLongStateOf(0L) }
-    var overlayVisible by remember { mutableStateOf(true) }
     LaunchedEffect(overlayToken) {
         overlayVisible = true
         delay(OVERLAY_MS)

@@ -42,6 +42,8 @@ import com.github.damontecres.wholphin.util.HomeRowLoadingState
 import com.github.damontecres.wholphin.util.HomeRowLoadingState.Success
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
@@ -638,22 +640,30 @@ class HomeSettingsService
                 }
 
                 is HomeRowConfig.ContinueWatchingCombined -> {
-                    val resume =
-                        latestNextUpService.getResume(
-                            userDto.id,
-                            limit,
-                            true,
-                            row.viewOptions.useSeries,
-                        )
-                    val nextUp =
-                        latestNextUpService.getNextUp(
-                            userDto.id,
-                            limit,
-                            prefs.enableRewatchingNextUp,
-                            false,
-                            prefs.maxDaysNextUp,
-                            row.viewOptions.useSeries,
-                        )
+                    val (resume, nextUp) =
+                        coroutineScope {
+                            val resumeDeferred =
+                                async {
+                                    latestNextUpService.getResume(
+                                        userDto.id,
+                                        limit,
+                                        true,
+                                        row.viewOptions.useSeries,
+                                    )
+                                }
+                            val nextUpDeferred =
+                                async {
+                                    latestNextUpService.getNextUp(
+                                        userDto.id,
+                                        limit,
+                                        prefs.enableRewatchingNextUp,
+                                        false,
+                                        prefs.maxDaysNextUp,
+                                        row.viewOptions.useSeries,
+                                    )
+                                }
+                            resumeDeferred.await() to nextUpDeferred.await()
+                        }
                     val combined = latestNextUpService.buildCombined(resume, nextUp)
 
                     Success(

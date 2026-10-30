@@ -154,8 +154,11 @@ class YouTubeService
                 // Video only streams have the higher resolutions, but need to be merged with an audio stream
                 val video =
                     info.videoOnlyStreams
-                        .filter { it.isUrl && it.height() <= maxHeight && it.format?.suffix == "mp4" }
-                        .maxByOrNull { it.height() }
+                        .filter {
+                            // H.264 only: AV1/VP9 fall back to software decoding on most TV sticks
+                            it.isUrl && it.height() <= maxHeight && it.format?.suffix == "mp4" &&
+                                it.codec?.startsWith("avc1") != false
+                        }.maxWithOrNull(compareBy({ it.height() }, { if (it.fps <= 30) 1 else 0 }))
                 val audio =
                     info.audioStreams
                         .filter { it.isUrl && it.format?.suffix == "m4a" }
