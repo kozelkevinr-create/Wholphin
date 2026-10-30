@@ -27,7 +27,6 @@ import androidx.tv.material3.Text
 import com.github.damontecres.wholphin.R
 import com.github.damontecres.wholphin.services.youtube.YouTubeVideo
 import com.github.damontecres.wholphin.ui.components.CircularProgress
-import com.github.damontecres.wholphin.ui.components.ConfirmDialog
 import com.github.damontecres.wholphin.ui.components.TextButton
 import com.github.damontecres.wholphin.ui.showToast
 
@@ -47,6 +46,7 @@ fun YouTubeListingPage(
     LaunchedEffect(Unit) { viewModel.messages.collect { showToast(context, it) } }
     val state by viewModel.state.collectAsStateWithLifecycle()
     var videoToDownload by remember { mutableStateOf<YouTubeVideo?>(null) }
+    val library by viewModel.library.state.collectAsStateWithLifecycle()
 
     Column(
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -61,6 +61,10 @@ fun YouTubeListingPage(
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.weight(1f, fill = false),
+            )
+            TextButton(
+                stringRes = if (url in library.savedUrls) R.string.youtube_saved_check else R.string.youtube_save,
+                onClick = { viewModel.toggleSaved(url, playlist, title) },
             )
             if (playlist) {
                 TextButton(
@@ -116,14 +120,14 @@ fun YouTubeListingPage(
     }
 
     videoToDownload?.let { video ->
-        ConfirmDialog(
-            title = stringResource(R.string.youtube_download_video),
-            body = video.title,
-            onCancel = { videoToDownload = null },
-            onConfirm = {
-                videoToDownload = null
-                viewModel.download(video.url, playlist = false, name = video.title)
-            },
+        YouTubeEntryActionsDialog(
+            entry = video,
+            savedUrls = library.savedUrls,
+            onDownload = { viewModel.download(video.url, playlist = false, name = video.title) },
+            onToggleSaved = {},
+            onToggleChannelSaved = viewModel::toggleChannelSaved,
+            onOpenChannel = viewModel::openChannel,
+            onDismiss = { videoToDownload = null },
         )
     }
 }

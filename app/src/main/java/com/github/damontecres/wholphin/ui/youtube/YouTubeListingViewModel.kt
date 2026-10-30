@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.damontecres.wholphin.services.NavigationManager
 import com.github.damontecres.wholphin.services.youtube.YouTubeDownloadService
+import com.github.damontecres.wholphin.services.youtube.SavedYouTube
+import com.github.damontecres.wholphin.services.youtube.YouTubeLibrary
 import com.github.damontecres.wholphin.services.youtube.YouTubeListing
 import com.github.damontecres.wholphin.services.youtube.YouTubeService
 import com.github.damontecres.wholphin.services.youtube.YouTubeVideo
@@ -34,6 +36,7 @@ class YouTubeListingViewModel
     constructor(
         private val youTubeService: YouTubeService,
         private val downloadService: YouTubeDownloadService,
+        val library: YouTubeLibrary,
         private val navigationManager: NavigationManager,
     ) : ViewModel() {
         private val _state = MutableStateFlow(YouTubeListingState())
@@ -91,6 +94,37 @@ class YouTubeListingViewModel
                     _state.update { it.copy(listing = listing.copy(cursor = null), loadingMore = false) }
                 }
             }
+        }
+
+        /**
+         * Save the channel or playlist being shown, or remove it if already saved
+         */
+        fun toggleSaved(
+            url: String,
+            playlist: Boolean,
+            fallbackTitle: String,
+        ) {
+            val listing = _state.value.listing
+            library.toggleSaved(
+                SavedYouTube(
+                    url = url,
+                    title = listing?.title ?: fallbackTitle,
+                    thumbnailUrl = listing?.thumbnailUrl,
+                    isPlaylist = playlist,
+                    detail = listing?.uploader,
+                    count = listing?.count ?: 0,
+                ),
+            )
+        }
+
+        fun toggleChannelSaved(video: YouTubeVideo) {
+            val url = video.channelUrl ?: return
+            library.toggleSaved(SavedYouTube(url, video.channel ?: url))
+        }
+
+        fun openChannel(video: YouTubeVideo) {
+            val url = video.channelUrl ?: return
+            navigationManager.navigateTo(Destination.YouTubeChannel(url, video.channel.orEmpty()))
         }
 
         fun play(video: YouTubeVideo) {
