@@ -10,6 +10,7 @@ import com.github.damontecres.wholphin.services.youtube.YouTubeEntry
 import com.github.damontecres.wholphin.services.youtube.YouTubeLibrary
 import com.github.damontecres.wholphin.services.youtube.YouTubePageResult
 import com.github.damontecres.wholphin.services.youtube.YouTubePlaylist
+import com.github.damontecres.wholphin.services.youtube.SavedYouTube
 import com.github.damontecres.wholphin.services.youtube.YouTubeService
 import com.github.damontecres.wholphin.services.youtube.YouTubeSettings
 import com.github.damontecres.wholphin.services.youtube.YouTubeSuggestions
@@ -140,6 +141,19 @@ class YouTubeViewModel
                     is YouTubePlaylist -> Destination.YouTubePlaylist(entry.url, entry.title)
                 }
             navigationManager.navigateTo(destination)
+        }
+
+        fun openChannel(video: YouTubeVideo) {
+            val url = video.channelUrl ?: return
+            navigationManager.navigateTo(Destination.YouTubeChannel(url, video.channel.orEmpty()))
+        }
+
+        /**
+         * Save the channel that made [video], or remove it if already saved
+         */
+        fun toggleChannelSaved(video: YouTubeVideo) {
+            val url = video.channelUrl ?: return
+            library.toggleSaved(SavedYouTube(url, video.channel ?: url))
         }
 
         fun showDownloads() {

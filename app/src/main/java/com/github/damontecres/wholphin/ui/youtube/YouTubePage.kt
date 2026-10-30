@@ -30,12 +30,10 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.github.damontecres.wholphin.R
 import com.github.damontecres.wholphin.services.youtube.YouTubeDownloadService
-import com.github.damontecres.wholphin.services.youtube.YouTubeChannel
 import com.github.damontecres.wholphin.services.youtube.YouTubeEntry
 import com.github.damontecres.wholphin.services.youtube.YouTubePlaylist
 import com.github.damontecres.wholphin.ui.components.BasicDialog
 import com.github.damontecres.wholphin.ui.components.CircularProgress
-import com.github.damontecres.wholphin.ui.components.ConfirmDialog
 import com.github.damontecres.wholphin.ui.components.SearchEditTextBox
 import com.github.damontecres.wholphin.ui.components.TextButton
 import com.github.damontecres.wholphin.ui.preferences.StringInput
@@ -54,7 +52,9 @@ fun YouTubePage(
     val state by viewModel.state.collectAsStateWithLifecycle()
     var query by rememberSaveable { mutableStateOf("") }
 
-    var entryToDownload by remember { mutableStateOf<YouTubeEntry?>(null) }
+    val library by viewModel.library.state.collectAsStateWithLifecycle()
+    val suggestions by viewModel.suggestionsState.collectAsStateWithLifecycle()
+    var entryActions by remember { mutableStateOf<YouTubeEntry?>(null) }
     var urlToDownload by remember { mutableStateOf<String?>(null) }
     var settingsStep by remember { mutableStateOf<SettingsStep?>(null) }
     var showOptions by remember { mutableStateOf(false) }
@@ -62,6 +62,7 @@ fun YouTubePage(
     LaunchedEffect(Unit) {
         viewModel.messages.collect { showToast(context, it) }
     }
+    LaunchedEffect(Unit) { viewModel.loadSuggestions() }
 
     Column(
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -83,6 +84,8 @@ fun YouTubePage(
                 onSearchClick = {
                     if (YouTubeDownloadService.isYouTubeUrl(query)) {
                         urlToDownload = query.trim()
+                    } else if (query.isBlank()) {
+                        viewModel.showHome()
                     } else {
                         viewModel.search(query)
                     }
@@ -117,10 +120,12 @@ fun YouTubePage(
                 }
 
                 !state.searched -> {
-                    Text(
-                        text = stringResource(R.string.youtube_search_hint),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.align(Alignment.Center),
+                    YouTubeHome(
+                        saved = library.saved,
+                        suggestions = suggestions,
+                        onOpen = viewModel::open,
+                        onLongClick = { entryActions = it },
+                        onRefresh = { viewModel.loadSuggestions(force = true) },
                     )
                 }
 
@@ -146,8 +151,7 @@ fun YouTubePage(
                             YouTubeEntryCard(
                                 entry = entry,
                                 onClick = { viewModel.open(entry) },
-                                // Channels are browsed, not downloaded in full
-                                onLongClick = { if (entry !is YouTubeChannel) entryToDownload = entry },
+                                onLongClick = { entryActions = entry },
                             )
                         }
                     }
@@ -165,19 +169,17 @@ fun YouTubePage(
         YouTubeSettingsDialog(viewModel.settings, onDismiss = { showOptions = false })
     }
 
-    entryToDownload?.let { entry ->
-        val isPlaylist = entry is YouTubePlaylist
-        ConfirmDialog(
-            title =
-                stringResource(
-                    if (isPlaylist) R.string.youtube_download_playlist else R.string.youtube_download_video,
-                ),
-            body = entry.title,
-            onCancel = { entryToDownload = null },
-            onConfirm = {
-                entryToDownload = null
-                requestDownload { viewModel.download(entry.url, playlist = isPlaylist, name = entry.title) }
+    entryActions?.let { entry ->
+        YouTubeEntryActionsDialog(
+            entry = entry,
+            savedUrls = library.savedUrls,
+            onDownload = {
+                requestDownload { viewModel.download(entry.url, playlist = entry is YouTubePlaylist, name = entry.title) }
             },
+            onToggleSaved = { viewModel.toggleSaved(entry) },
+            onToggleChannelSaved = viewModel::toggleChannelSaved,
+            onOpenChannel = viewModel::openChannel,
+            onDismiss = { entryActions = null },
         )
     }
 

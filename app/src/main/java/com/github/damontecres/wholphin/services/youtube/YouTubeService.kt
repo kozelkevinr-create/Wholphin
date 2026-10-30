@@ -93,6 +93,11 @@ data class YouTubeListing(
     val title: String,
     val videos: List<YouTubeVideo>,
     val cursor: YouTubeCursor? = null,
+    val thumbnailUrl: String? = null,
+    /** Subscribers of a channel or videos in a playlist */
+    val count: Long = 0,
+    /** Who made a playlist */
+    val uploader: String? = null,
 )
 
 /**
@@ -175,6 +180,8 @@ class YouTubeService
                     info.name,
                     tabInfo?.relatedItems.orEmpty().filterIsInstance<StreamInfoItem>().map { it.toVideo() },
                     tabInfo?.nextPage?.let { YouTubeCursor(YouTubeCursor.Kind.CHANNEL, videosTab, it) },
+                    thumbnailUrl = info.avatars.firstOrNull()?.url,
+                    count = info.subscriberCount,
                 )
             }
 
@@ -188,6 +195,9 @@ class YouTubeService
                     info.name,
                     info.relatedItems.filterIsInstance<StreamInfoItem>().map { it.toVideo() },
                     info.nextPage?.let { YouTubeCursor(YouTubeCursor.Kind.PLAYLIST, url, it) },
+                    thumbnailUrl = info.thumbnails.firstOrNull()?.url,
+                    count = info.streamCount,
+                    uploader = info.uploaderName,
                 )
             }
 
