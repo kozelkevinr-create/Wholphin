@@ -7,10 +7,12 @@ import com.github.damontecres.wholphin.services.youtube.YouTubeChannel
 import com.github.damontecres.wholphin.services.youtube.YouTubeCursor
 import com.github.damontecres.wholphin.services.youtube.YouTubeDownloadService
 import com.github.damontecres.wholphin.services.youtube.YouTubeEntry
+import com.github.damontecres.wholphin.services.youtube.YouTubeLibrary
 import com.github.damontecres.wholphin.services.youtube.YouTubePageResult
 import com.github.damontecres.wholphin.services.youtube.YouTubePlaylist
 import com.github.damontecres.wholphin.services.youtube.YouTubeService
 import com.github.damontecres.wholphin.services.youtube.YouTubeSettings
+import com.github.damontecres.wholphin.services.youtube.YouTubeSuggestions
 import com.github.damontecres.wholphin.services.youtube.YouTubeVideo
 import com.github.damontecres.wholphin.ui.nav.Destination
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,6 +24,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
+
+data class YouTubeSuggestionsState(
+    val loading: Boolean = false,
+    val videos: List<YouTubeVideo> = emptyList(),
+)
 
 data class YouTubeState(
     val loading: Boolean = false,
@@ -39,10 +46,17 @@ class YouTubeViewModel
         private val youTubeService: YouTubeService,
         private val downloadService: YouTubeDownloadService,
         val settings: YouTubeSettings,
+        val library: YouTubeLibrary,
+        private val suggestions: YouTubeSuggestions,
         private val navigationManager: NavigationManager,
     ) : ViewModel() {
         private val _state = MutableStateFlow(YouTubeState())
         val state: StateFlow<YouTubeState> = _state
+
+        private val _suggestions = MutableStateFlow(YouTubeSuggestionsState())
+
+        /** The "suggested for you" videos shown when not searching */
+        val suggestionsState: StateFlow<YouTubeSuggestionsState> = _suggestions
 
         private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 4)
 
@@ -81,6 +95,33 @@ class YouTubeViewModel
                 }
             }
         }
+
+        /**
+         * Load the "suggested for you" videos. Does nothing more than refresh if already loaded and unchanged
+         */
+        fun loadSuggestions(force: Boolean = false) {
+            if (_suggestions.value.loading) return
+            _suggestions.update { it.copy(loading = true) }
+            viewModelScope.launch {
+                val videos =
+                    try {
+                        suggestions.get(force)
+                    } catch (ex: Exception) {
+                        Timber.e(ex, "Error loading YouTube suggestions")
+                        emptyList()
+                    }
+                _suggestions.update { YouTubeSuggestionsState(loading = false, videos = videos) }
+            }
+        }
+
+        /**
+         * Leave the search results and go back to saved items & suggestions
+         */
+        fun showHome() {
+            _state.update { YouTubeState() }
+        }
+
+        fun toggleSaved(entry: YouTubeEntry) = library.toggleSaved(entry)
 
         fun search(query: String) {
             if (query.isNotBlank()) {
