@@ -270,6 +270,7 @@ class HomeDataService
                     Success(
                         title,
                         studios,
+                        rowType = row,
                         viewOptions = row.viewOptions,
                         showViewMore = studios.size >= limit,
                     )

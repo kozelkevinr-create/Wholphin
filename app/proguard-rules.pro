@@ -31,3 +31,6 @@
 -keep class org.mozilla.classfile.ClassFileWriter
 -dontwarn org.mozilla.javascript.tools.**
 -keep class org.schabi.newpipe.extractor.timeago.patterns.** { *; }
+
+# Keep external/native functions
+-keep class com.suyashbelekar.exoplayerhdrutils.libdovi.LibDovi { *; }

@@ -67,10 +67,12 @@ import com.github.damontecres.wholphin.ui.rememberInt
 import com.github.damontecres.wholphin.ui.showToast
 import com.github.damontecres.wholphin.ui.toServerString
 import com.github.damontecres.wholphin.ui.tryRequestFocus
+import com.github.damontecres.wholphin.ui.util.goToRandom
 import com.github.damontecres.wholphin.util.ApiRequestPager
 import com.github.damontecres.wholphin.util.BlockingList
 import com.github.damontecres.wholphin.util.DataLoadingState
 import com.github.damontecres.wholphin.util.ExceptionHandler
+import com.github.damontecres.wholphin.util.GetAlbumArtistsHandler
 import com.github.damontecres.wholphin.util.GetArtistsHandler
 import com.github.damontecres.wholphin.util.GetItemsRequestHandler
 import com.github.damontecres.wholphin.util.GetPersonsHandler
@@ -99,6 +101,7 @@ import org.jellyfin.sdk.model.api.CollectionType
 import org.jellyfin.sdk.model.api.ImageType
 import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.SortOrder
+import org.jellyfin.sdk.model.api.request.GetAlbumArtistsRequest
 import org.jellyfin.sdk.model.api.request.GetArtistsRequest
 import org.jellyfin.sdk.model.api.request.GetItemsRequest
 import org.jellyfin.sdk.model.api.request.GetPersonsRequest
@@ -149,6 +152,9 @@ class CollectionFolderViewModel
 
         private val _state = MutableStateFlow(CollectionFolderState(viewOptions = defaultViewOptions))
         val state: StateFlow<CollectionFolderState> = _state
+
+        private val artistSource: ArtistSource
+            get() = state.value.viewOptions.artistSource
 
         var position: Int
             get() = savedStateHandle.get<Int>("position") ?: 0
@@ -290,7 +296,17 @@ class CollectionFolderViewModel
 
         override fun saveViewOptions(viewOptions: ViewOptions) {
             position = 0
+            val artistSourceChanged = viewOptions.artistSource != artistSource
             _state.update { it.copy(viewOptions = viewOptions) }
+            if (artistSourceChanged && state.value.filter.override == GetItemsFilterOverride.ARTIST) {
+                loadResults(
+                    true,
+                    state.value.sortAndDirection,
+                    recursive,
+                    state.value.filter,
+                    useSeriesForPrimary,
+                )
+            }
             viewModelScope.launch(ExceptionHandler() + WholphinDispatchers.IO) {
                 saveLibraryDisplayInfo(viewOptions = viewOptions)
                 if (!viewOptions.showBackdrop) {
@@ -302,11 +318,19 @@ class CollectionFolderViewModel
         override fun onClickRandom() {
             viewModelScope.launchIO {
                 try {
-                    val random =
-                        (state.value.items.successValue as? BlockingList<BaseItem?>)?.randomBlocking()
-                    Timber.d("Got random item: %s", random?.id)
-                    random?.destination()?.let {
-                        navigateTo(random.destination())
+                    val state = state.value
+                    val list = state.items.successValue as? BlockingList<BaseItem?>
+                    if (list != null) {
+                        goToRandom(
+                            navigateTo = ::navigateTo,
+                            parentId = itemId,
+                            filter = state.filter,
+                            sortAndDirection = state.sortAndDirection,
+                            recursive = recursive,
+                            list = list,
+                        )
+                    } else {
+                        Timber.w("state.value.items is not successful: %s", state.items)
                     }
                 } catch (ex: CancellationException) {
                     throw ex
@@ -432,13 +456,27 @@ class CollectionFolderViewModel
                 }
 
                 GetItemsFilterOverride.ARTIST -> {
-                    ApiRequestPager(
-                        api,
-                        createGetArtistsRequest(filter),
-                        GetArtistsHandler,
-                        viewModelScope,
-                        useSeriesForPrimary = useSeriesForPrimary,
-                    )
+                    when (artistSource) {
+                        ArtistSource.ARTIST -> {
+                            ApiRequestPager(
+                                api,
+                                createGetArtistsRequest(filter),
+                                GetArtistsHandler,
+                                viewModelScope,
+                                useSeriesForPrimary = useSeriesForPrimary,
+                            )
+                        }
+
+                        ArtistSource.ALBUM_ARTIST -> {
+                            ApiRequestPager(
+                                api,
+                                createGetAlbumArtistsRequest(filter),
+                                GetAlbumArtistsHandler,
+                                viewModelScope,
+                                useSeriesForPrimary = useSeriesForPrimary,
+                            )
+                        }
+                    }
                 }
             }
 
@@ -450,6 +488,17 @@ class CollectionFolderViewModel
             val item = state.value.item.successValue
             return filter.applyTo(
                 GetArtistsRequest(
+                    parentId = item?.id,
+                    enableImageTypes = listOf(ImageType.PRIMARY, ImageType.THUMB),
+                    fields = SlimItemFields,
+                ),
+            )
+        }
+
+        private fun createGetAlbumArtistsRequest(filter: GetItemsFilter): GetAlbumArtistsRequest {
+            val item = state.value.item.successValue
+            return filter.applyTo(
+                GetAlbumArtistsRequest(
                     parentId = item?.id,
                     enableImageTypes = listOf(ImageType.PRIMARY, ImageType.THUMB),
                     fields = SlimItemFields,
@@ -528,18 +577,37 @@ class CollectionFolderViewModel
                 val filter = state.value.filter
                 when (filter.override) {
                     GetItemsFilterOverride.ARTIST -> {
-                        GetArtistsHandler.countMatching(
-                            api = api,
-                            request =
-                                createGetArtistsRequest(filter).copy(
-                                    enableImageTypes = null,
-                                    fields = null,
-                                    nameLessThan = letter.toString(),
-                                    limit = 0,
-                                    enableTotalRecordCount = true,
-                                    enableUserData = false,
-                                ),
-                        )
+                        when (artistSource) {
+                            ArtistSource.ARTIST -> {
+                                GetArtistsHandler.countMatching(
+                                    api = api,
+                                    request =
+                                        createGetArtistsRequest(filter).copy(
+                                            enableImageTypes = null,
+                                            fields = null,
+                                            nameLessThan = letter.toString(),
+                                            limit = 0,
+                                            enableTotalRecordCount = true,
+                                            enableUserData = false,
+                                        ),
+                                )
+                            }
+
+                            ArtistSource.ALBUM_ARTIST -> {
+                                GetAlbumArtistsHandler.countMatching(
+                                    api = api,
+                                    request =
+                                        createGetAlbumArtistsRequest(filter).copy(
+                                            enableImageTypes = null,
+                                            fields = null,
+                                            nameLessThan = letter.toString(),
+                                            limit = 0,
+                                            enableTotalRecordCount = true,
+                                            enableUserData = false,
+                                        ),
+                                )
+                            }
+                        }
                     }
 
                     // GetPersonsRequest has no nameLessThan or startIndex, so /Persons cannot be
@@ -1118,6 +1186,7 @@ fun CollectionFolderViewContent(
         ViewOptionsDialog(
             viewOptions = state.viewOptions,
             defaultViewOptions = defaultViewOptions,
+            showArtistSource = state.filter.override == GetItemsFilterOverride.ARTIST,
             onDismissRequest = {
                 showViewOptions = false
                 viewActions.saveViewOptions(state.viewOptions)

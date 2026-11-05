@@ -391,6 +391,7 @@ dependencies {
     implementation(libs.androidx.media3.ui.compose)
     implementation(libs.newpipe.extractor)
     implementation(libs.ass.media)
+    implementation(libs.exoplayerhdrutils)
 
     implementation(libs.coil.core)
     implementation(libs.coil.compose)
